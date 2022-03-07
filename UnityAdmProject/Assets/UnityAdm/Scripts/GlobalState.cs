@@ -82,6 +82,7 @@ namespace ADM
         public static AudioRendererType audioRendererType = AudioRendererType.NONE;
 
         // BEAR Specific config
+        public static string BearDataFilePath = "";
         public static int BearMaxObjectChannels = 32;
         public static int BearMaxDirectSpeakerChannels = 24;
         public static int BearMaxHoaChannels = 0;

@@ -3,8 +3,8 @@ using System.Collections;
 
 public static class OpenVrWrapper
 {
-    private static int hmdIndex = -1;
 #if STEAMVR
+    private static int hmdIndex = -1;
     private static Valve.VR.TrackedDevicePose_t[] trackedDevicePose;
 #endif
 
@@ -45,8 +45,8 @@ public static class OpenVrWrapper
                 }
             }
         }
-#endif
         hmdIndex = -1;
+#endif
         return false;
     }
 

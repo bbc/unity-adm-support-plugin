@@ -337,8 +337,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: baeec23f8d0ab0f48b39d0e0f96f637c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ADMAudioClip: {fileID: 0}
-  ADMAudioPath: D:/ADM_Test_files/Protest.wav
+  ADMAudioClip: {fileID: 8300000, guid: b2030e2ec7bf04f21b818e31250d3172, type: 3}
+  ADMAudioPath: C:/Users/matthewf/Desktop/ADM/unity-adm-support/UnityAdmProject/Assets/pn_noise_static_ADM.wav
   useVisualisations: 1
   objectVisualisation: {fileID: 5691614383277277070, guid: d09a82cef5e25469c9ad41d1e6fce8ea,
     type: 3}
@@ -359,15 +359,15 @@ MonoBehaviour:
   schedulingWindowTime: 0.5
   runMetadataPullThread: 0
   metadataPullThreadCheckPeriod: 5
-  directSpeakersXOffset: 0
-  directSpeakersYOffset: 0
-  directSpeakersZOffset: 0
+  directSpeakersUnityXOffset: 0
+  directSpeakersUnityYOffset: 0
+  directSpeakersUnityZOffset: 0
   directSpeakersAzimuthOffset: 0
   directSpeakersElevationOffset: 0
   directSpeakersDistanceMultiplier: 1
-  objectsXOffset: 0
-  objectsYOffset: 0
-  objectsZOffset: 0
+  objectsUnityXOffset: 0
+  objectsUnityYOffset: 0
+  objectsUnityZOffset: 0
   objectsAzimuthOffset: 0
   objectsElevationOffset: 0
   objectsDistanceMultiplier: 1

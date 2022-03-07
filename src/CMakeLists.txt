@@ -63,9 +63,18 @@ target_compile_features(libunityadm
 )
 
 install(TARGETS libunityadm
-    DESTINATION ${PROJECT_SOURCE_DIR}/UnityAdmProject/Assets/UnityADM/Plugins
+    DESTINATION Assets/UnityAdm/Plugins
+)
+
+set_property(TARGET libunityadm PROPERTY
+  VS_DEBUGGER_COMMAND ${UNITY_EXECUTABLE}
+)
+
+set_property(TARGET libunityadm PROPERTY
+  VS_DEBUGGER_COMMAND_ARGUMENTS "-projectPath ${PROJECT_SOURCE_DIR}/UnityAdmProject"
 )
 
 ExternalProject_Get_Property(default_tensorfile DOWNLOADED_FILE)
 
-install(FILES ${DOWNLOADED_FILE} DESTINATION ${PROJECT_SOURCE_DIR}/UnityAdmProject/Assets/UnityADM/Data)
+add_dependencies(libunityadm default_tensorfile)
+install(FILES ${DOWNLOADED_FILE} DESTINATION Assets/UnityAdm/Data)

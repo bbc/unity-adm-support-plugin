@@ -35,7 +35,9 @@ public class UnityAdm : MonoBehaviour
     public uint BEARMaxDirectSpeakerChannels = 24;
     public uint BEARMaxHoaChannels = 16;
     [Tooltip("Use this string to specify a specfic FFT library for BEAR to use. A blank string will fall back to the default implementation.")]
-    public string BEARUseFFTImplementation = "";
+    public string BEARUseFFTImplementation = "ffts";
+    [Tooltip("Provide a path to the *.tf file used by BEAR for binaural rendering. If unspecified, it will default to /Assets/UnityADM/Data/default.tf")]
+    public string BEARDataFilePath = "";
     [Tooltip("If the media sample rate does not match the project sample rate, sample rate conversion will be necessary.\n" +
         "Choose the SRC method here.")]
     public SrcType BEARUseSRCType = SrcType.SincMediumQuality;
@@ -61,16 +63,20 @@ public class UnityAdm : MonoBehaviour
         "\nAlso note that 0 sleep period is often fine given that this is running in a thread.")]
     public uint metadataPullThreadCheckPeriod = 5;
 
-    public double directSpeakersXOffset = 0.0;
-    public double directSpeakersYOffset = 0.0;
-    public double directSpeakersZOffset = 0.0;
+    public double directSpeakersUnityXOffset = 0.0;
+    [Tooltip("Y axis in Unity (Z axis in ADM!)")]
+    public double directSpeakersUnityYOffset = 0.0;
+    [Tooltip("Z axis in Unity (Y axis in ADM!)")]
+    public double directSpeakersUnityZOffset = 0.0;
     public double directSpeakersAzimuthOffset = 0.0;
     public double directSpeakersElevationOffset = 0.0;
     public double directSpeakersDistanceMultiplier = 1.0;
 
-    public double objectsXOffset = 0.0;
-    public double objectsYOffset = 0.0;
-    public double objectsZOffset = 0.0;
+    public double objectsUnityXOffset = 0.0;
+    [Tooltip("Y axis in Unity (Z axis in ADM!)")]
+    public double objectsUnityYOffset = 0.0;
+    [Tooltip("Z axis in Unity (Y axis in ADM!)")]
+    public double objectsUnityZOffset = 0.0;
     public double objectsAzimuthOffset = 0.0;
     public double objectsElevationOffset = 0.0;
     public double objectsDistanceMultiplier = 1.0;
@@ -83,13 +89,15 @@ public class UnityAdm : MonoBehaviour
 
     private void Awake()
     {
-        initialise();
     }
 
     private void Start()
     {
         // Find HMD
         OpenVrWrapper.updateHmdIndex();
+
+        applySettings();
+        initialise();
 
         if (startPlaybackOnProjectRun)
         {
@@ -162,7 +170,6 @@ public class UnityAdm : MonoBehaviour
         GlobalState.setPlaybackStopped();
         if (GlobalState.audioRenderer != null) GlobalState.audioRenderer.stopAudioPlayback();
         DebugPlaybackTracker.updatePlaybackStateDebugMessage();
-        initialise(); // Constructs new modules. Old ones discarded and garbage collected.
     }
 
     public void applySettings()
@@ -237,19 +244,18 @@ public class UnityAdm : MonoBehaviour
         OpenVrWrapper.recentreListener();
 	}
 
-    public void initialise()
+    public void shutdown()
     {
-        // Use this method to destroy and reconstruct modules according to current settings.
-        // Will also be done automatically on "Awake" and "stopPlayback".
-        // This is particularly important for BEAR which needs restarting in order to jump to another place in the audio.
+        // Use this method to destroy existing modules.
+        // initialise MUST be called following this before using any further functionality
 
-        if(GlobalState.playbackState == PlaybackState.SCHEDULED || GlobalState.playbackState == PlaybackState.STARTED)
+        if (GlobalState.playbackState == PlaybackState.SCHEDULED || GlobalState.playbackState == PlaybackState.STARTED)
         {
-            Debug.LogError("Can not initialise() when playing!");
+            Debug.LogError("Can not shutdown() when playing!");
             return;
         }
 
-        if(GlobalState.gameObjectHandler != null)
+        if (GlobalState.gameObjectHandler != null)
         {
             GlobalState.gameObjectHandler.shutdown();
             GlobalState.gameObjectHandler = null;
@@ -267,6 +273,22 @@ public class UnityAdm : MonoBehaviour
             GlobalState.metadataHandler = null;
         }
 
+    }
+
+    public void initialise()
+    {
+        // Use this method to destroy and reconstruct modules according to current settings.
+        // Will also be done automatically on "Start".
+        // This is particularly important for BEAR which needs restarting in order to jump to another place in the audio.
+
+        if(GlobalState.playbackState == PlaybackState.SCHEDULED || GlobalState.playbackState == PlaybackState.STARTED)
+        {
+            Debug.LogError("Can not initialise() when playing!");
+            return;
+        }
+
+        shutdown();
+
         GlobalState.startingAdmPlayheadPosition = startingPlayheadPosition;
         GlobalState.schedulingWindow = schedulingWindowTime;
         GlobalState.runThread = runMetadataPullThread;
@@ -279,21 +301,22 @@ public class UnityAdm : MonoBehaviour
         GlobalState.BearMaxObjectChannels = (int)BEARMaxObjectChannels;
         GlobalState.BearMaxDirectSpeakerChannels = (int)BEARMaxDirectSpeakerChannels;
         GlobalState.BearMaxHoaChannels = (int)BEARMaxHoaChannels;
+        GlobalState.BearDataFilePath = BEARDataFilePath;
         GlobalState.BearFftImplementation = BEARUseFFTImplementation;
         GlobalState.BearOutputGain = BEAROutputGain;
         GlobalState.BearInternalBlockSize = (int)BEARInternalBlockSize;
         GlobalState.defaultReferenceDistance = defaultReferenceDistance;
         GlobalState.BearSrcType = BEARUseSRCType;
 
-        GlobalState.directSpeakersXOffset = directSpeakersXOffset;
-        GlobalState.directSpeakersYOffset = directSpeakersYOffset;
-        GlobalState.directSpeakersZOffset = directSpeakersZOffset;
+        GlobalState.directSpeakersXOffset = directSpeakersUnityXOffset;
+        GlobalState.directSpeakersYOffset = directSpeakersUnityZOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.directSpeakersZOffset = directSpeakersUnityYOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
         GlobalState.directSpeakersAzimuthOffset = directSpeakersAzimuthOffset;
         GlobalState.directSpeakersElevationOffset = directSpeakersElevationOffset;
         GlobalState.directSpeakersDistanceMultiplier = directSpeakersDistanceMultiplier;
-        GlobalState.objectsXOffset = objectsXOffset;
-        GlobalState.objectsYOffset = objectsYOffset;
-        GlobalState.objectsZOffset = objectsZOffset;
+        GlobalState.objectsXOffset = objectsUnityXOffset;
+        GlobalState.objectsYOffset = objectsUnityZOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.objectsZOffset = objectsUnityYOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
         GlobalState.objectsAzimuthOffset = objectsAzimuthOffset;
         GlobalState.objectsElevationOffset = objectsElevationOffset;
         GlobalState.objectsDistanceMultiplier = objectsDistanceMultiplier;
@@ -334,6 +357,12 @@ public class UnityAdm : MonoBehaviour
         }
 
         GlobalState.metadataHandler.getBlocksInitialPull();
+    }
+
+    void OnDestroy()
+    {
+        stopPlayback();
+        shutdown();
     }
 
 }

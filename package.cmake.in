@@ -1,0 +1,102 @@
+function(git_describe varname)
+  execute_process(COMMAND
+  		"${GIT_EXECUTABLE}"
+  		describe
+  		${ARGN}
+  		WORKING_DIRECTORY
+  		"${CMAKE_CURRENT_SOURCE_DIR}"
+  		RESULT_VARIABLE
+  		ret
+  		OUTPUT_VARIABLE
+  		out
+  		OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(ret EQUAL 0)
+    set(${varname} ${out} PARENT_SCOPE)
+  else()
+    message(STATUS "GIT_EXECUTABLE: " ${GIT_EXECUTABLE})
+    message(STATUS "ARGN: " ${ARGN})
+    message(STATUS "CMAKE_CURRENT_SOURCE_DIR: " ${CMAKE_CURRENT_SOURCE_DIR})
+  endif()
+endfunction()
+
+
+
+
+message(STATUS "*** ! PACKAGE WILL BE CREATED FROM CURRENTLY INSTALLED BUILD PRODUCTS ! ***")
+message(STATUS "*** --- Please ensure you INSTALL before PACKAGE ---  ***")
+
+set(Unity "@UNITY_EXECUTABLE@")
+if (APPLE)
+	if(EXISTS "${Unity}/Contents/MacOS/Unity")
+		set(Unity "${Unity}/Contents/MacOS/Unity")
+	endif()
+endif()
+
+set(TargetOS ${CMAKE_SYSTEM_NAME})
+if (APPLE)
+	string(REPLACE "Darwin" "MacOS" TargetOS ${TargetOS})
+endif()
+set(TargetArch ${CMAKE_SYSTEM_PROCESSOR})
+if (APPLE)
+	string(REPLACE "x86_64" "Intel_x64" TargetArch ${TargetArch})
+endif()
+string(REPLACE "AMD64" "x64" TargetArch ${TargetArch})
+
+if(EXISTS "${Unity}")
+
+	set(projectDirectory "@PROJECT_SOURCE_DIR@/UnityAdmProject/")
+	set(outputPackageDirectory "@PROJECT_BINARY_DIR@/")
+	set(versionFile "${projectDirectory}Assets/UnityAdm/VERSION")
+	set(outputPackageFilename "UnityADM")
+	
+	if(EXISTS "${versionFile}")
+		file(REMOVE "${versionFile}")
+	endif()
+	if(EXISTS "${versionFile}.meta")
+		file(REMOVE "${versionFile}.meta")
+	endif()
+	
+	find_package(Git)
+	set(LONG_VER "")
+	set(SHORT_VER "")
+	
+	if(Git_FOUND)
+		git_describe(LONG_VER --tags --always --dirty)
+		message(STATUS "Writing VERSION information...")
+		file(WRITE "${versionFile}" ${LONG_VER} "\n" ${TargetOS} "\n" ${TargetArch})
+		git_describe(SHORT_VER --tags --abbrev=0)
+		set(outputPackageFilename "${outputPackageFilename}-v${SHORT_VER}")
+	else()  
+		message(WARNING "Unable to find Git for version information!")
+		file(WRITE "${versionFile}" "Version information not available.\n" ${TargetOS} "\n" ${TargetArch})
+	endif()
+
+	set(outputPackageFilename "${outputPackageFilename}-${TargetOS}(${TargetArch}).unitypackage")
+	set(outputPackage "${outputPackageDirectory}${outputPackageFilename}")
+
+	message(STATUS "Running Unity to build package...")
+	message(STATUS "   Unity executable:  ${Unity}")
+	message(STATUS "   Project directory: ${projectDirectory}")
+	message(STATUS "   Output package:    ${outputPackage}")
+
+	execute_process(COMMAND
+  		"${Unity}"
+		-batchmode 
+		-quit 
+		-projectPath ${projectDirectory} 
+		-executeMethod Packaging.buildPackage 
+		-outputPackage ${outputPackage}
+  		RESULT_VARIABLE	ret
+  		OUTPUT_VARIABLE	out
+	)
+	
+	message(STATUS "   Return code ${ret}")
+	if(${ret} EQUAL 0)
+		message(STATUS "Done: ${out}")
+	else()
+		message(FATAL_ERROR ${out})
+	endif()
+
+else ()
+	message(FATAL_ERROR "UNITY_EXECUTABLE not found at: @UNITY_EXECUTABLE@")
+endif() 

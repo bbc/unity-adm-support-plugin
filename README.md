@@ -48,6 +48,7 @@ To generate and upload keys;
 - Set Build directory to the `unity-adm-support-plugin/build` directory 
 - "Configure"
 - If not done automatically, set `Boost_INCLUDE_DIR` to your Boost directory
+- To enable packaging, set `UNITY_EXECUTABLE` to the path to the Unity executable version you'd like to use for exporting the package
 - "Configure", "Generate", "Open"
 
 *From your IDE...*
@@ -63,16 +64,33 @@ To generate and upload keys;
 ---------
 ## Packages and Packaging
 
-The Unity ADM plugin is packaged as an Asset Package with the naming convention `UnityADM-([os]_[arch]).unitypackage`. 
+The Unity ADM plugin is packaged as an Asset Package with the naming convention `UnityADM-[version]-[OS]([Arch]).unitypackage`. 
 
 ### Use in existing projects
-The plugin will expect to find the SteamVR package within the same project, so ensure you download that from the asset store and import it.
+If you'd like to use unity, the plugin will expect to find the SteamVR package within the same project, so ensure you download that from the asset store and import it.
 
 Add the Unity ADM package to your existing project via the menu; `Assets -> Import Package -> Custom Package`. Then simply apply the `UnityAdm.cs` script to an object in the scene (usually main camera is fine). Configure it via the Inspector.
 
 ### Creating/updating packages
-Firstly, ensure you have built release versions of the native plugin (`libunityadm`) for the platform(s) you wish to support. Run the CMake `INSTALL` target to ensure the built library is copied to the correct location as well as the `default.tf` data file.
 
-Secondly, update the readme in the `UnityAdm` folder!
+For both Automatic and Manual packaging method, you must first;
 
-Using the Unity project included in this repository, go to `Assets -> Export Package`. Ensure only items in the `UnityAdm` folder are selected. Select export and provide a name according to the aforementioned naming convention.
+- Configure and Generate using cmake - this will create build files for the native library.
+- Build the "ALL_BUILD" cmake target to compile the native library.
+- Build the "INSTALL" cmake target to copy the compiled `libunityadm` native library, the `default.tf` data file, and the LICENSE and COPYRIGHT notices to the correct locations in the Unity project from which the package will be generated.
+- Update the readme in the `UnityAdm` folder of the Unity project
+
+The Automatic method is recommended as this will also generate a VERSION file.
+
+#### Automatically
+
+Note: For this to work, you must have correctly set the `UNITY_EXECUTABLE` Cmake variable
+
+- Tag the commit if it is a version milestone
+- Build the cmake "PACKAGING" target
+
+#### Manually through the Unity development environment
+
+- Using the Unity project included in this repository, go to `Assets -> Export Package`. 
+- Ensure only items in the `UnityAdm` folder are selected in the dialog that appears. If there is a VERSION file present, this MUST NOT be selected as it will be out of date.
+- Click Export and provide a name according to the aforementioned naming convention.

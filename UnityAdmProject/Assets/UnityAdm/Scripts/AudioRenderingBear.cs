@@ -169,6 +169,7 @@ namespace ADM
             if (DebugSettings.ModuleStartups) Debug.Log("Starting BearAudioRenderer...");
 
             gameObject = new GameObject("BEAR Audio");
+            UnityEngine.Object.DontDestroyOnLoad(gameObject);
             filter = gameObject.AddComponent<UnityAdmFilterComponent>();
             filter.enabled = true;
             audioSource = gameObject.GetComponent<AudioSource>();
@@ -202,7 +203,11 @@ namespace ADM
             audioClip = AudioClip.Create("BEAR", clipFrames, 2, sampleRate, true, OnAudioReadBear, OnAudioSetPositionBear);
             audioSource.clip = audioClip;
 
-            string filepath = PathHelpers.GetApplicationPath() + "/Assets/UnityADM/Data/default.tf";
+            string filepath = GlobalState.BearDataFilePath;
+            if (filepath != null && filepath.Trim().Length == 0)
+            {
+                filepath = PathHelpers.GetApplicationPath() + "/Assets/UnityADM/Data/default.tf";
+            }
             if (System.IO.File.Exists(filepath))
             {
                 int opBufferFrames, opBufferCount;
@@ -257,7 +262,7 @@ namespace ADM
         public void stopAudioPlayback()
         {
             offsetCalculated = false;
-            audioSource.Stop();
+            if (audioSource) audioSource.Stop();
         }
 
         public void configureNewItems(ref List<UInt64> itemsAwaitingConfig)
@@ -372,9 +377,12 @@ namespace ADM
 
         public void shutdown()
         {
-            if (DebugSettings.ModuleStartups) Debug.Log("Killing BearAudioRenderer...");
-            audioSource.Stop();
-            UnityEngine.Object.Destroy(gameObject);
+            if (audioSource || gameObject)
+            {
+                if (DebugSettings.ModuleStartups) Debug.Log("Killing BearAudioRenderer...");
+                if (audioSource) audioSource.Stop();
+                if (gameObject) UnityEngine.Object.DestroyImmediate(gameObject);
+            }
         }
     }
 }
