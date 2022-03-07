@@ -1,0 +1,17 @@
+[submodule "submodules/libadm"]
+	path = submodules/libadm
+	url = https://github.com/ebu/libadm.git
+[submodule "submodules/libbw64"]
+	path = submodules/libbw64
+	url = https://github.com/ebu/libbw64.git
+[submodule "submodules/bear"]
+	path = submodules/bear
+	url = git@github.com:bbc/rd-audio-bear.git
+	branch = master
+[submodule "submodules/rd-audio-visr"]
+	path = submodules/rd-audio-visr
+	url = git@github.com:bbc/rd-audio-visr.git
+	branch = bear-develop-tomn
+[submodule "submodules/libsamplerate"]
+	path = submodules/libsamplerate
+	url = git@github.com:libsndfile/libsamplerate.git

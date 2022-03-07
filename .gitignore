@@ -1,0 +1,6 @@
+build*
+*.bundle
+*.app/
+.DS_Store
+default.tf
+*.unitypackage
