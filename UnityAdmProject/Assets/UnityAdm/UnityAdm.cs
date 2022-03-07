@@ -16,10 +16,14 @@ public class UnityAdm : MonoBehaviour
     public GameObject objectVisualisation;
     public GameObject speakerVisualisation;
     public GameObject hoaVisualisation;
-    [Tooltip("The default value to multiply coordinates with in order to convert to real-world distances. \n" +
-        "This value will be used unless an AudioPackFormat specifies its own absoluteDistance parameter.\n" +
-        "This will also affect any distance-related effects when using Unity native rendering.")]
+    [Tooltip("The default value to multiply coordinates with in order to convert to real-world distances.\n" +
+        "This value will be used if 'alwaysOverrideAbsoluteDistance' is checked or if an AudioPackFormat does not specify its own AbsoluteDistance value.\n" +
+        "This will also affect any distance-related effects when using Unity native rendering.\n" +
+        "(* Can be changed at runtime, but only affects newly received metadata blocks (i.e, not for file-based ADM))")]
     public float defaultReferenceDistance = 1.0f;
+    [Tooltip("Always overrides AbsoluteDistance with the value of 'Default Reference Distance', whether originally present or not.\n" +
+       "(* Can be changed at runtime, but only affects newly received metadata blocks (i.e, not for file-based ADM))")]
+    public bool alwaysOverrideAbsoluteDistance = false;
 
     [Header("Audio Renderer")]
     [Tooltip("Audio renderer to use\n" +
@@ -27,6 +31,7 @@ public class UnityAdm : MonoBehaviour
         "\n - BEAR renderer supports Objects, DirectSpeakers and HOA.")]
     public AudioRendererType audioRendererType = AudioRendererType.BEAR;
     [Header("Audio Renderer - BEAR Specific Settings")]
+    [Tooltip("(* Can be changed at runtime)")]
     public float BEAROutputGain = 0.775f;
     [Tooltip("Note that the buffer/block size of the output audio device will also affect latency.\n" +
         "Also note that powers of two are likely to be far more performant.")]
@@ -39,8 +44,14 @@ public class UnityAdm : MonoBehaviour
     [Tooltip("Provide a path to the *.tf file used by BEAR for binaural rendering. If unspecified, it will default to /Assets/UnityADM/Data/default.tf")]
     public string BEARDataFilePath = "";
     [Tooltip("If the media sample rate does not match the project sample rate, sample rate conversion will be necessary.\n" +
-        "Choose the SRC method here.")]
+        "Choose the SRC method here.\n" +
+        "(* Can be changed at runtime)")]
     public SrcType BEARUseSRCType = SrcType.SincMediumQuality;
+	[Tooltip("(* Can be changed at runtime)")]
+    public bool BEARRenderOnlySelectedAudioProgramme = false;
+    [Tooltip("This is the ID of the AudioProgramme to render (e.g, AP_1001) if the above checkbox is checked.\n" +
+        "(* Can be changed at runtime)")]
+    public string BEARSelectedAudioProgrammeID = "";
 
     [Header("Audio Playback")]
     public bool startPlaybackOnProjectRun = false;
@@ -222,6 +233,36 @@ public class UnityAdm : MonoBehaviour
         if (BEARInternalBlockSize > 8192) BEARInternalBlockSize = 8192;
         if (defaultReferenceDistance < 0.0f) defaultReferenceDistance = 1.0f;
         GlobalState.defaultReferenceDistance = defaultReferenceDistance;
+        GlobalState.alwaysOverrideAbsoluteDistance = alwaysOverrideAbsoluteDistance;
+
+        // AudioProgramme selection for BEAR
+
+        bool apNeedUpdate = BEARRenderOnlySelectedAudioProgramme != GlobalState.renderOnlySelectedAudioProgramme;
+        int BEARSelectedAudioProgrammeIDAsInt = 0;
+        if (BEARRenderOnlySelectedAudioProgramme) {
+            BEARSelectedAudioProgrammeIDAsInt = IdHelpers.intFromAudioProgrammeId(BEARSelectedAudioProgrammeID);
+            if (BEARSelectedAudioProgrammeIDAsInt != GlobalState.selectedAudioProgrammeId)
+            {
+                apNeedUpdate = true;
+            }
+        }
+        if(apNeedUpdate)
+        {
+            GlobalState.selectedAudioProgrammeId = BEARSelectedAudioProgrammeIDAsInt;
+            GlobalState.renderOnlySelectedAudioProgramme = BEARRenderOnlySelectedAudioProgramme;
+            ADM.BearAudioRenderer renderer = ADM.GlobalState.audioRenderer as ADM.BearAudioRenderer;
+            if (renderer != null)
+            {
+                if (GlobalState.renderOnlySelectedAudioProgramme)
+                {
+                    renderer.setAudioProgrammeId(GlobalState.selectedAudioProgrammeId);
+                }
+                else
+                {
+                    renderer.resetAudioProgrammeId();
+                }
+            }
+        }
 
         // Offsets
 
@@ -306,6 +347,7 @@ public class UnityAdm : MonoBehaviour
         GlobalState.BearOutputGain = BEAROutputGain;
         GlobalState.BearInternalBlockSize = (int)BEARInternalBlockSize;
         GlobalState.defaultReferenceDistance = defaultReferenceDistance;
+        GlobalState.alwaysOverrideAbsoluteDistance = alwaysOverrideAbsoluteDistance;
         GlobalState.BearSrcType = BEARUseSRCType;
 
         GlobalState.directSpeakersXOffset = directSpeakersUnityXOffset;
@@ -352,7 +394,12 @@ public class UnityAdm : MonoBehaviour
         }
         else if (GlobalState.audioRendererType == AudioRendererType.BEAR)
         {
-            GlobalState.audioRenderer = new BearAudioRenderer();
+            ADM.BearAudioRenderer renderer = new BearAudioRenderer();
+            if (GlobalState.renderOnlySelectedAudioProgramme)
+            {
+                renderer.setAudioProgrammeId(GlobalState.selectedAudioProgrammeId);
+            }
+            GlobalState.audioRenderer = renderer;
             LibraryInterface.setBearOutputGain(BEAROutputGain);
         }
 

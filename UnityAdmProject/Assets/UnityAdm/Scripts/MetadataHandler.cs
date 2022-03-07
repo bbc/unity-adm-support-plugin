@@ -33,6 +33,7 @@ namespace ADM
         public int currentBlockIndex;
         public MetadataRunState metadataRunState;
         public AdmTypeDefs typeDef;
+        public List<int> audioProgrammeIds;
 
         public double audioStartTime;
         public double audioEndTime;
@@ -96,21 +97,23 @@ namespace ADM
         {
             if (!_finalPosInGameSet)
             {
-                if (!double.IsNaN(metadataBlock.absoluteDistance) && metadataBlock.absoluteDistance >= 0.0)
-                {
-                    // NOTE: Z and Y are swapped!! different coordinate systems;
-                    _finalPosInGame.Set(
-                        (float)(metadataBlock.x * metadataBlock.absoluteDistance),
-                        (float)(metadataBlock.z * metadataBlock.absoluteDistance),
-                        (float)(metadataBlock.y * metadataBlock.absoluteDistance));
-                }
-                else
+
+                // NOTE: Z and Y are swapped!! different coordinate systems;
+                if(double.IsNaN(metadataBlock.absoluteDistance))
                 {
                     _finalPosInGame.Set(
                         (float)(metadataBlock.x * GlobalState.defaultReferenceDistance),
                         (float)(metadataBlock.z * GlobalState.defaultReferenceDistance),
                         (float)(metadataBlock.y * GlobalState.defaultReferenceDistance));
                 }
+                else
+                {
+                    _finalPosInGame.Set(
+                        (float)(metadataBlock.x * metadataBlock.absoluteDistance),
+                        (float)(metadataBlock.z * metadataBlock.absoluteDistance),
+                        (float)(metadataBlock.y * metadataBlock.absoluteDistance));
+                }
+
                 _finalPosInGameSet = true;
             }
             return ref _finalPosInGame;
@@ -331,6 +334,12 @@ namespace ADM
                     {
                         prepareItem(ref latestIncomingMetadata);
                     }
+                    for (int i = 0; i < latestIncomingMetadata.audioProgrammeIdCount; i++) {
+                        int audioProgrammeId = latestIncomingMetadata.audioProgrammeId[i];
+                        if (!renderableItems[latestIncomingMetadata.id].audioProgrammeIds.Contains(audioProgrammeId)){
+                            renderableItems[latestIncomingMetadata.id].audioProgrammeIds.Add(audioProgrammeId);
+                        }
+                    }
                     renderableItems[latestIncomingMetadata.id].blocks.Add(populateBlockData(latestIncomingMetadata));
                 }
 
@@ -423,6 +432,12 @@ namespace ADM
 
             }
 
+            //absoluteDistance
+            if (GlobalState.alwaysOverrideAbsoluteDistance || double.IsNaN(metadataBlock.absoluteDistance) || metadataBlock.absoluteDistance < 0.0)
+            {
+                metadataBlock.absoluteDistance = GlobalState.defaultReferenceDistance;
+            }
+
             block.metadataBlock = metadataBlock;
 
             return block;
@@ -437,6 +452,7 @@ namespace ADM
             {
                 itemData.originChannelNums.Add(metadataBlock.channelNums[i]);
             }
+            itemData.audioProgrammeIds = new List<int>();
             itemData.name = StringHelpers.asciiBytesToString(metadataBlock.name);
             itemData.blocks = new List<BlockData>();
             itemData.currentBlockIndex = 0;

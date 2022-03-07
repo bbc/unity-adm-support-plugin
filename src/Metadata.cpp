@@ -4,6 +4,44 @@
 #include "ExceptionHandler.h"
 #include <algorithm>
 
+std::string MetadataExtractor::generatePresentedName(std::vector<std::shared_ptr<adm::AudioObject>> &audioObjectTree, std::vector<std::shared_ptr<adm::AudioPackFormat>> &audioPackFormatTree, std::shared_ptr<adm::AudioChannelFormat> audioChannelFormat, adm::TypeDescriptor typeDefinition) {
+    std::string presentedName{};
+    std::string audioObjectName{};
+    std::string audioPackFormatName{};
+    std::string audioChannelFormatName{};
+    if(audioObjectTree.size() > 0 && audioObjectTree.back()->has<adm::AudioObjectName>()) {
+        audioObjectName = audioObjectTree.back()->get<adm::AudioObjectName>().get();
+    }
+    if(typeDefinition == adm::TypeDefinition::DIRECT_SPEAKERS || typeDefinition == adm::TypeDefinition::OBJECTS) {
+        // These assets are treated as independent channels
+        if(audioPackFormatTree.size() > 0 && audioPackFormatTree.back()->has<adm::AudioPackFormatName>()) {
+            audioPackFormatName = audioPackFormatTree.back()->get<adm::AudioPackFormatName>().get();
+        }
+        if(audioChannelFormat && audioChannelFormat->has<adm::AudioChannelFormatName>()) {
+            audioChannelFormatName = audioChannelFormat->get<adm::AudioChannelFormatName>().get();
+        }
+    }
+    if(audioObjectName.length() > 0) {
+        presentedName = audioObjectName;
+    }
+    if(audioPackFormatName.length() > 0 && audioPackFormatName != audioObjectName) {
+        if(presentedName.length() > 0) {
+            presentedName += " -> ";
+        }
+        presentedName += audioPackFormatName;
+    }
+    if(audioChannelFormatName.length() > 0 && audioChannelFormatName != audioPackFormatName) {
+        if(presentedName.length() > 0) {
+            presentedName += " -> ";
+        }
+        presentedName += audioChannelFormatName;
+    }
+    if(presentedName.length() == 0) {
+        presentedName = "(Unknown)";
+    }
+    return presentedName;
+}
+
 RenderableItemChannelId MetadataExtractor::generateRenderableItemChannelId(std::shared_ptr<adm::AudioTrackUid> trackUid)
 {
     return trackUid->get<adm::AudioTrackUidId>().get<adm::AudioTrackUidIdValue>().get();
@@ -24,7 +62,6 @@ RenderableItemId MetadataExtractor::generateRenderableItemId(std::shared_ptr<adm
 
     return op;
 }
-
 
 MetadataExtractor::MetadataExtractor(Reader * parentReader, std::shared_ptr<adm::Document> parsedDocument) : parentReader{ parentReader }, parsedDocument{ parsedDocument }
 {
@@ -163,6 +200,15 @@ bool MetadataExtractor::getNextMetadataBlock(MetadataBlock * metadataBlock)
             strncpy(metadataBlock->name, currentItem->presentedName.c_str(), sizeof(metadataBlock->name));
             strncpy(metadataBlock->audioPackFormatId, currentItemChannel->audioPackFormatId.c_str(), sizeof(metadataBlock->audioPackFormatId));
 
+            int idCount = 0;
+            for(int i = 0; i < currentItem->admTrees.size(); i++) {
+                if(currentItem->admTrees[i].audioProgramme) {
+                    metadataBlock->audioProgrammeId[idCount] = currentItem->admTrees[i].audioProgrammeId;
+                    idCount++;
+                }
+            }
+            metadataBlock->audioProgrammeIdCount = idCount;
+
             idIndexOfLastRenderableItemSent = itemIdIndex;
             return true;
         }
@@ -208,184 +254,169 @@ int MetadataExtractor::discoverViaAudioObject(std::shared_ptr<adm::AudioProgramm
 }
 
 int MetadataExtractor::discoverFromAudioTrackUid(std::shared_ptr<adm::AudioProgramme> audioProgramme, std::shared_ptr<adm::AudioContent> audioContent, std::vector<std::shared_ptr<adm::AudioObject>> audioObjectTree, std::shared_ptr<adm::AudioTrackUid> audioTrackUid) {
-    auto id = generateRenderableItemChannelId(audioTrackUid);
+
+    RenderableItemChannelId id = generateRenderableItemId(audioObjectTree.size() > 0? audioObjectTree.back() : nullptr, audioTrackUid);
+    std::shared_ptr<RenderableItemChannel> renderableItemChannel;
+    bool newRenderableItemCreated = false;
 
     // Firstly check if we already have it!
     auto existing = getValuePointerFromMap(renderableItemChannels, id);
-    if(existing) return 0;
+    if(existing) {
 
-    // Create it
-    auto renderableItemChannel = std::make_shared<RenderableItemChannel>();
-    renderableItemChannel->selfId = id;
-    renderableItemChannel->renderableItem.reset();
+        renderableItemChannel = *existing;
 
-    renderableItemChannel->valid = true;
-    renderableItemChannel->channelNum = parentReader->getChannelNumFor(audioTrackUid);
-    renderableItemChannel->lastSentBlockIndex = -1; // No blocks pulled yet
-
-    renderableItemChannel->audioTrackUid = audioTrackUid;
-    renderableItemChannel->audioChannelFormat = nullptr;
-    renderableItemChannel->audioStreamFormat = nullptr;
-    renderableItemChannel->audioTrackFormat = audioTrackUid->getReference<adm::AudioTrackFormat>();
-    renderableItemChannel->audioPackFormatTree = std::vector<std::shared_ptr<adm::AudioPackFormat>>();
-    renderableItemChannel->audioPackFormatId = "";
-
-    renderableItemChannel->highPass = NAN;
-    renderableItemChannel->lowPass = NAN;
-    renderableItemChannel->absoluteDistance = NAN;
-
-    // Temp local vars
-    adm::TypeDescriptor typeDefinition = adm::TypeDefinition::UNDEFINED;
-
-    // We need to get to PF/CF to discover TD and work out if we need to create a new RenderableItem...
-    //  Do that first because if we reuse existing, we can omit loads of look-ups
-
-    if(renderableItemChannel->audioTrackFormat) {
-        renderableItemChannel->audioStreamFormat = renderableItemChannel->audioTrackFormat->getReference<adm::AudioStreamFormat>();
-    }
-
-    if(renderableItemChannel->audioStreamFormat) {
-        renderableItemChannel->audioChannelFormat = renderableItemChannel->audioStreamFormat->getReference<adm::AudioChannelFormat>();
-        if(renderableItemChannel->audioChannelFormat->has<adm::Frequency>()) {
-            auto freq = renderableItemChannel->audioChannelFormat->get<adm::Frequency>();
-            if(freq.has<adm::LowPass>()) {
-                renderableItemChannel->lowPass = freq.get<adm::LowPass>().get();
-            }
-            if(freq.has<adm::HighPass>()) {
-                renderableItemChannel->highPass = freq.get<adm::HighPass>().get();
-            }
-        }
-    }
-
-    if(audioObjectTree.size() > 0 && renderableItemChannel->audioChannelFormat) {
-        auto pfs = audioObjectTree.back()->getReferences<adm::AudioPackFormat>();
-        for(auto pf : pfs) {
-            auto res = tracePackFormatTree(pf, renderableItemChannel->audioChannelFormat);
-            if(res.has_value() && res->size() > 0) {
-                renderableItemChannel->audioPackFormatTree = *res;
-                break;
-            }
-        }
-    }
-
-    if(renderableItemChannel->audioPackFormatTree.size() > 0) {
-        renderableItemChannel->audioPackFormatId = formatId(renderableItemChannel->audioPackFormatTree.back()->get<adm::AudioPackFormatId>());
-        if(renderableItemChannel->audioPackFormatTree.back()->has<adm::AbsoluteDistance>()) {
-            renderableItemChannel->absoluteDistance = renderableItemChannel->audioPackFormatTree.back()->get<adm::AbsoluteDistance>().get();
-        }
-        typeDefinition = renderableItemChannel->audioPackFormatTree.back()->get<adm::TypeDescriptor>();
     } else {
-        renderableItemChannel->valid = false;
-    }
 
-    if(renderableItemChannel->channelNum < 0 || !renderableItemChannel->audioChannelFormat) {
-        renderableItemChannel->valid = false;
+        // Create it
+        renderableItemChannel = std::make_shared<RenderableItemChannel>();
+        renderableItemChannel->selfId = id;
+        renderableItemChannel->typeDefinition = adm::TypeDefinition::UNDEFINED;
+        renderableItemChannel->renderableItem.reset();
+
+        renderableItemChannel->valid = true;
+        renderableItemChannel->channelNum = parentReader->getChannelNumFor(audioTrackUid);
+        renderableItemChannel->lastSentBlockIndex = -1; // No blocks pulled yet
+
+        renderableItemChannel->audioTrackUid = audioTrackUid;
+        renderableItemChannel->audioChannelFormat = nullptr;
+        renderableItemChannel->audioStreamFormat = nullptr;
+        renderableItemChannel->audioTrackFormat = audioTrackUid->getReference<adm::AudioTrackFormat>();
+        renderableItemChannel->audioPackFormatTree = std::vector<std::shared_ptr<adm::AudioPackFormat>>();
+        renderableItemChannel->audioPackFormatId = "";
+
+        renderableItemChannel->highPass = NAN;
+        renderableItemChannel->lowPass = NAN;
+        renderableItemChannel->absoluteDistance = NAN;
+
+
+        // We need to get to PF/CF to discover TD and work out if we need to create a new RenderableItem...
+        //  Do that first because if we reuse existing, we can omit loads of look-ups
+
+        if(renderableItemChannel->audioTrackFormat) {
+            renderableItemChannel->audioStreamFormat = renderableItemChannel->audioTrackFormat->getReference<adm::AudioStreamFormat>();
+        }
+
+        if(renderableItemChannel->audioStreamFormat) {
+            renderableItemChannel->audioChannelFormat = renderableItemChannel->audioStreamFormat->getReference<adm::AudioChannelFormat>();
+            if(renderableItemChannel->audioChannelFormat->has<adm::Frequency>()) {
+                auto freq = renderableItemChannel->audioChannelFormat->get<adm::Frequency>();
+                if(freq.has<adm::LowPass>()) {
+                    renderableItemChannel->lowPass = freq.get<adm::LowPass>().get();
+                }
+                if(freq.has<adm::HighPass>()) {
+                    renderableItemChannel->highPass = freq.get<adm::HighPass>().get();
+                }
+            }
+        }
+
+        if(audioObjectTree.size() > 0 && renderableItemChannel->audioChannelFormat) {
+            auto pfs = audioObjectTree.back()->getReferences<adm::AudioPackFormat>();
+            for(auto pf : pfs) {
+                auto res = tracePackFormatTree(pf, renderableItemChannel->audioChannelFormat);
+                if(res.has_value() && res->size() > 0) {
+                    renderableItemChannel->audioPackFormatTree = *res;
+                    break;
+                }
+            }
+        }
+
+        if(renderableItemChannel->audioPackFormatTree.size() > 0) {
+            renderableItemChannel->audioPackFormatId = formatId(renderableItemChannel->audioPackFormatTree.back()->get<adm::AudioPackFormatId>());
+            if(renderableItemChannel->audioPackFormatTree.back()->has<adm::AbsoluteDistance>()) {
+                renderableItemChannel->absoluteDistance = renderableItemChannel->audioPackFormatTree.back()->get<adm::AbsoluteDistance>().get();
+            }
+            renderableItemChannel->typeDefinition = renderableItemChannel->audioPackFormatTree.back()->get<adm::TypeDescriptor>();
+        } else {
+            renderableItemChannel->valid = false;
+        }
+
+        if(renderableItemChannel->channelNum < 0 || !renderableItemChannel->audioChannelFormat) {
+            renderableItemChannel->valid = false;
+        }
+
+        // Register new RenderableItemChannel
+        setInMap(renderableItemChannels, id, renderableItemChannel);
+        newRenderableItemCreated = true;
     }
 
     // OK... now get existing/create new RenderableItem
 
     RenderableItemId renderableItemId = 0;
-    std::shared_ptr<RenderableItem> renderableItem;
-    bool createNewRenderableItem = false;
-    bool independentChannelItems = true;
+    if(audioObjectTree.size() > 0) {
+        if(renderableItemChannel->typeDefinition == adm::TypeDefinition::DIRECT_SPEAKERS || renderableItemChannel->typeDefinition == adm::TypeDefinition::OBJECTS) {
+            // Independent channels, therefore always new RenderableItem, ID'd by AudioObject and TrackUID
+            renderableItemId = generateRenderableItemId(audioObjectTree.back(), audioTrackUid);
 
-    if(typeDefinition == adm::TypeDefinition::DIRECT_SPEAKERS || typeDefinition == adm::TypeDefinition::OBJECTS) {
-        // Independent channels, therefore always new RenderableItem, ID'd by TrackUID
-        independentChannelItems = true;
-        renderableItemId = generateRenderableItemId(nullptr, audioTrackUid);
-        assert(!getFromMap(renderableItems, renderableItemId).has_value());
-
-        // Instantiate and register RenderableItem
-        createNewRenderableItem = true;
-
-    } else if(typeDefinition == adm::TypeDefinition::HOA) {
-        // Grouped channels, ID'd by AudioObject
-        independentChannelItems = false;
-        assert(audioObjectTree.size() > 0);
-        if(audioObjectTree.size() > 0) {
+        } else if(renderableItemChannel->typeDefinition == adm::TypeDefinition::HOA) {
+            // Grouped channels, ID'd by AudioObject
             renderableItemId = generateRenderableItemId(audioObjectTree.back(), nullptr);
-            auto existingRenderableItem = getFromMap(renderableItems, renderableItemId);
 
-            if(existingRenderableItem.has_value() && (*existingRenderableItem) != nullptr) {
-                renderableItem = *existingRenderableItem;
-            } else
-            {
-                // Instantiate and register RenderableItem
-                createNewRenderableItem = true;
-            }
+        } else {
+            // TODO: We don't support other typedefs at the mo
+            renderableItemChannel->valid = false;
         }
-
     } else {
-        // TODO: We don't support other typedefs at the mo
+        // Unowned channels don't render
         renderableItemChannel->valid = false;
     }
 
-    if(createNewRenderableItem) {
-        assert(renderableItemId > 0);
-        renderableItem = std::make_shared<RenderableItem>();
-        renderableItem->selfId = renderableItemId;
+    std::shared_ptr<RenderableItem> renderableItem;
+    if(renderableItemId != 0) {
+        auto existingRenderableItem = getFromMap(renderableItems, renderableItemId);
 
-        renderableItem->presentedName = "";
-        renderableItem->typeDefinition = typeDefinition;
-
-        renderableItem->audioProgramme = audioProgramme;
-        renderableItem->audioContent = audioContent;
-        renderableItem->audioObjectTree = audioObjectTree;
-
-        renderableItem->startTime = 0.0;
-        renderableItem->duration = INFINITY;
-        renderableItem->endTime = INFINITY;
-
-        /// Naming
-        std::string audioObjectName{};
-        std::string audioPackFormatName{};
-        std::string audioChannelFormatName{};
-        if(audioObjectTree.size() > 0 && audioObjectTree.back()->has<adm::AudioObjectName>()) {
-            audioObjectName = audioObjectTree.back()->get<adm::AudioObjectName>().get();
+        if(existingRenderableItem.has_value() && (*existingRenderableItem) != nullptr) {
+            renderableItem = *existingRenderableItem;
+        } else {
+            renderableItem = std::make_shared<RenderableItem>();
+            setInMap(renderableItems, renderableItemId, renderableItem);
         }
-        if(independentChannelItems) {
-            if(renderableItemChannel->audioPackFormatTree.size() > 0 && renderableItemChannel->audioPackFormatTree.back()->has<adm::AudioPackFormatName>()) {
-                audioPackFormatName = renderableItemChannel->audioPackFormatTree.back()->get<adm::AudioPackFormatName>().get();
-            }
-            if(renderableItemChannel->audioChannelFormat && renderableItemChannel->audioChannelFormat->has<adm::AudioChannelFormatName>()) {
-                audioChannelFormatName = renderableItemChannel->audioChannelFormat->get<adm::AudioChannelFormatName>().get();
-            }
-        }
-        if(audioObjectName.length() > 0) {
-            renderableItem->presentedName = audioObjectName;
-        }
-        if(audioPackFormatName.length() > 0 && audioPackFormatName != audioObjectName) {
-            if(renderableItem->presentedName.length() > 0) {
-                renderableItem->presentedName += " -> ";
-            }
-            renderableItem->presentedName += audioPackFormatName;
-        }
-        if(audioChannelFormatName.length() > 0 && audioChannelFormatName != audioPackFormatName) {
-            if(renderableItem->presentedName.length() > 0) {
-                renderableItem->presentedName += " -> ";
-            }
-            renderableItem->presentedName += audioChannelFormatName;
-        }
-        if(renderableItem->presentedName.length() == 0) {
-            renderableItem->presentedName = "(Unknown)";
-        }
-
-        /// Timing
-        if(audioObjectTree.size() > 0) {
-            if(audioObjectTree.back()->has<adm::Start>()) {
-                renderableItem->startTime = audioObjectTree.back()->get<adm::Start>().get().count() / 1000000000.0;
-            }
-            if(audioObjectTree.back()->has<adm::Duration>()) {
-                renderableItem->duration = audioObjectTree.back()->get<adm::Duration>().get().count() / 1000000000.0;
-                renderableItem->endTime = renderableItem->startTime + renderableItem->duration;
-            }
-        }
-
-        // Register new RenderableItem
-        setInMap(renderableItems, renderableItem->selfId, renderableItem);
     }
 
     if(renderableItem) {
+
+        bool pushAdmTree = false;
+        if(renderableItem->admTrees.size() == 0) {
+            // new RenderableItem - fill out all info
+            pushAdmTree = true;
+            renderableItem->selfId = renderableItemId;
+            renderableItem->typeDefinition = renderableItemChannel->typeDefinition;
+            renderableItem->audioObjectTree = audioObjectTree;
+            renderableItem->presentedName = generatePresentedName(audioObjectTree, renderableItemChannel->audioPackFormatTree, renderableItemChannel->audioChannelFormat, renderableItemChannel->typeDefinition);
+            renderableItem->startTime = 0.0;
+            renderableItem->duration = INFINITY;
+            renderableItem->endTime = INFINITY;
+            if(audioObjectTree.size() > 0) {
+                if(audioObjectTree.back()->has<adm::Start>()) {
+                    renderableItem->startTime = audioObjectTree.back()->get<adm::Start>().get().count() / 1000000000.0;
+                }
+                if(audioObjectTree.back()->has<adm::Duration>()) {
+                    renderableItem->duration = audioObjectTree.back()->get<adm::Duration>().get().count() / 1000000000.0;
+                    renderableItem->endTime = renderableItem->startTime + renderableItem->duration;
+                }
+            }
+
+        } else {
+            // existing RenderableItem - just add tree if not already present.
+            auto isPresent = [audioProgramme, audioContent](ItemAdmTree &existingAdmTree){
+                return existingAdmTree.audioProgramme == audioProgramme && existingAdmTree.audioContent == audioContent;
+            };
+            if(std::find_if(renderableItem->admTrees.begin(), renderableItem->admTrees.end(), isPresent) == renderableItem->admTrees.end()) {
+                // Append tree - wasn't already present
+                pushAdmTree = true;
+            }
+        }
+        if(pushAdmTree) {
+            uint16_t audioProgrammeId = 0;
+            if(audioProgramme) {
+                audioProgrammeId = static_cast<uint16_t>(std::stoul(adm::formatId(audioProgramme->get<adm::AudioProgrammeId>()).substr(4), nullptr, 16));
+            }
+            uint16_t audioContentId = 0;
+            if(audioContent) {
+                uint16_t audioContentId = static_cast<uint16_t>(std::stoul(adm::formatId(audioContent->get<adm::AudioContentId>()).substr(4), nullptr, 16));
+            }
+            renderableItem->admTrees.push_back({ audioProgramme, audioContent, audioProgrammeId, audioContentId });
+        }
+
         // Tie together RenderableItem <-> RenderableItemChannel
         setInMap(renderableItem->renderableItemChannels, renderableItemChannel->selfId, renderableItemChannel);
         renderableItemChannel->renderableItem = renderableItem;
@@ -413,10 +444,7 @@ int MetadataExtractor::discoverFromAudioTrackUid(std::shared_ptr<adm::AudioProgr
 
     }
 
-    // Register new RenderableItemChannel
-    setInMap(renderableItemChannels, id, renderableItemChannel);
-
-    return 1;
+    return newRenderableItemCreated? 1:0;
 }
 
 std::optional<std::vector<std::shared_ptr<adm::AudioPackFormat>>> MetadataExtractor::tracePackFormatTree(std::shared_ptr<adm::AudioPackFormat> fromPackFormat, std::shared_ptr<adm::AudioChannelFormat> toChannelFormat, std::vector<std::shared_ptr<adm::AudioPackFormat>> history)

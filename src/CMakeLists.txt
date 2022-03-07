@@ -74,7 +74,7 @@ set_property(TARGET libunityadm PROPERTY
   VS_DEBUGGER_COMMAND_ARGUMENTS "-projectPath ${PROJECT_SOURCE_DIR}/UnityAdmProject"
 )
 
-ExternalProject_Get_Property(default_tensorfile DOWNLOADED_FILE)
+ExternalProject_Get_Property(tensorfile_default DOWNLOADED_FILE)
 
-add_dependencies(libunityadm default_tensorfile)
+add_dependencies(libunityadm tensorfile_default)
 install(FILES ${DOWNLOADED_FILE} DESTINATION Assets/UnityAdm/Data)

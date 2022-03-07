@@ -2,6 +2,7 @@ build*
 *.bundle
 *.app/
 .DS_Store
+submodules/visr
 
 # Gets downloaded automatically by cmake scripts
 default.tf

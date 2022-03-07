@@ -21,6 +21,9 @@ namespace ADM
         [MarshalAs(UnmanagedType.ByValArray, SizeConst = 100)]
         public CppChar[] name;
         public UInt8 typeDef;
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
+        public UInt16[] audioProgrammeId; // Limit to contributing to 64 progs max
+        public UInt8 audioProgrammeIdCount;
 
         public double audioStartTime;
         public double audioEndTime;

@@ -6,10 +6,7 @@
 	url = https://github.com/ebu/libbw64.git
 [submodule "submodules/bear"]
 	path = submodules/bear
-	url = git@github.com:bbc/rd-audio-bear.git
-[submodule "submodules/rd-audio-visr"]
-	path = submodules/rd-audio-visr
-	url = git@github.com:bbc/rd-audio-visr.git
+	url = https://github.com/ebu/bear.git
 [submodule "submodules/libsamplerate"]
 	path = submodules/libsamplerate
-	url = git@github.com:libsndfile/libsamplerate.git
+	url = https://github.com/libsndfile/libsamplerate.git

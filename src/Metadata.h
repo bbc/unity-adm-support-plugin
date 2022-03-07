@@ -9,12 +9,18 @@ using RenderableItemId = uint64_t;
 using RenderableItemChannelId = uint64_t;
 struct RenderableItemChannel;
 
+struct ItemAdmTree {
+    std::shared_ptr<adm::AudioProgramme> audioProgramme;
+    std::shared_ptr<adm::AudioContent> audioContent;
+    uint16_t audioProgrammeId;
+    uint16_t audioContentId;
+};
+
 struct RenderableItem {
     RenderableItemId selfId;
     std::string presentedName;
     adm::TypeDescriptor typeDefinition;
-    std::shared_ptr<adm::AudioProgramme> audioProgramme;
-    std::shared_ptr<adm::AudioContent> audioContent;
+    std::vector<ItemAdmTree> admTrees;
     std::vector<std::shared_ptr<adm::AudioObject>> audioObjectTree;
     std::map<RenderableItemChannelId, std::shared_ptr<RenderableItemChannel>> renderableItemChannels;
     double startTime;
@@ -24,6 +30,7 @@ struct RenderableItem {
 
 struct RenderableItemChannel {
     RenderableItemChannelId selfId;
+    adm::TypeDescriptor typeDefinition;
     std::shared_ptr<RenderableItem> renderableItem;
     std::string audioPackFormatId;
     std::vector<std::shared_ptr<adm::AudioPackFormat>> audioPackFormatTree;
@@ -48,6 +55,8 @@ struct MetadataBlock
     uint8_t channelNums[64];
     char name[100];
     uint8_t typeDef;
+    uint16_t audioProgrammeId[64]; // Limit to contributing to 64 progs max
+    uint8_t audioProgrammeIdCount;
 
     double audioStartTime;
     double audioEndTime;
@@ -130,6 +139,7 @@ private:
 
     RenderableItemChannelId generateRenderableItemChannelId(std::shared_ptr<adm::AudioTrackUid> trackUid);
     RenderableItemId generateRenderableItemId(std::shared_ptr<adm::AudioObject> audioObject, std::shared_ptr<adm::AudioTrackUid> trackUid);
+    std::string generatePresentedName(std::vector<std::shared_ptr<adm::AudioObject>> &audioObjectTree, std::vector<std::shared_ptr<adm::AudioPackFormat>> &audioPackFormatTree, std::shared_ptr<adm::AudioChannelFormat> audioChannelFormat, adm::TypeDescriptor typeDefinition);
     int discoverViaAudioProgramme(std::shared_ptr<adm::AudioProgramme> audioProgramme);
     int discoverViaAudioContent(std::shared_ptr<adm::AudioProgramme> audioProgramme, std::shared_ptr<adm::AudioContent> audioContent);
     int discoverViaAudioObject(std::shared_ptr<adm::AudioProgramme> audioProgramme, std::shared_ptr<adm::AudioContent> audioContent, std::vector<std::shared_ptr<adm::AudioObject>> audioObjectTree);

@@ -1,5 +1,6 @@
 # QUICK-START GUIDE
 
+- Set Project Settings to "Allow 'unsafe' code" ("Player" options under "Edit > Project Settings"). This is simply to allow direct access to the audio buffers used by Unity.
 - Import the Unity package ("Assets > Import Package > Custom Package...")
 - Attach to the Main Camera (Drag and drop the UnityAdm Script from the Assets/UnityAdm folder in to the Inspector whilst the Main Camera is selected)
 - Drag an ADM clip on to the "ADM Audio Clip" parameter in the Inpector for the UnityAdm script
@@ -13,8 +14,10 @@
 ## Import the Package
 
 - Steps may vary based on Unity version. This is based on 2019.4.1f1.
-- Unity provides an ‘Import Package’ feature which handles the installation process, copying the required files into the correct locations in the project. 
-- From the menu bar, "Assets > Import Package > Custom Package..." and select the .unitypackage file.
+- In the Unity Editor with a project open, go to "Edit> Project Settings". Select "Player" in the left-hand pane. Check "Allow 'unsafe' code". Unsafe code is essentially code which attempts to directly access data stored in memory by address. In this plugin, this technique is used for efficiency. It allows the native library to access the metadata and audio buffers used within Unity without the overhead of copying back-and-forth. Code which accesses data this way has to be very carefully designed to avoid addresses becoming stale if data is destroyed or moved in memory by a concurrent process, hence the term 'unsafe'.
+- Unity provides an ‘Import Package’ feature which handles the installation process, copying the required files into the correct locations in the project. From the menu bar, "Assets > Import Package > Custom Package..." and select the .unitypackage file.
+- In the "Import Unity Package" dialog which appears, ensure all items are selected and click "Import"
+- In your projects "Assets" folder, you should now have a new "UnityAdm" folder
 
 ## Add the Plugin to your project
 
@@ -31,9 +34,9 @@
 
 - The plugin can be configured from the Inspector pane once the main script (UnityAdm) has been placed on a Game Object.
 - Parameters have tooltip hints to explain their purpose - hover over a parameter to read a description.
-- To assign the ADM media to play back, an audio clip from the project can be dropped on to the "ADM Audio Clip" parameter, or a file path can be provided using the "ADM Audio Path" parameter.
+- To assign the ADM media to play back, an audio clip from the project can be dropped on to the "ADM Audio Clip" parameter, or a file path can be provided using the "ADM Audio Path" parameter (please see notes below regarding use of paths in built projects).
 - Most parameters can be controlled programatically (when parameters are changed at runtime, `applySettings()` should be called, followed by `initialise()`). The most important parameters are;
-	- `AudioClip ADMAudioClip` and `string ADMAudioPath`; Both of these properties set the source media for rendering. This can either be an AudioClip from a file which is already included in the project, or a path to media can set instead.
+	- `string ADMAudioPath`; This is the path to the ADM media to be rendered. You should ensure this is portable within your project and within built projects (see Building notes below)
 	- `uint BEARMaxObjectChannels`, `uint BEARMaxDirectSpeakersChannels` and `uint BEARMaxHoaChannels`; When BEAR is constructed, it will reserve a specific number of input channels and audio processing pipelines for different types of input, which can be configured with these parameters. If these numbers are set lower than required by the input media, some audio sources will be omitted from the render. 
 
 ## Controlling the Plugin during runtime
@@ -59,7 +62,11 @@ script.initialise();
 	- `schedulePlayback(double forDspTime)`; Precisely synchronise playback against the DSP clock.
 	- `recentreListener()`;reset the listener position and orientation readings from XR headset. This is only functional if the plugin has been compiled with SteamVR support.
 
+## Building Unity Projects with the plugin
 
+When building a Unity project as an executable, some preparation is required;
+
+- When a file containing ADM media is dragged on the to plugin script in the Inspector pane, the absolute path of that file is determined and placed in the "ADM Audio Path" field. Although this is fine as a quick development feature, an absolute path to a file in the project directory (or subdirectory) is not portable - you should use a relative path. This can be set programmatically (`UnityAdm.ADMAudioPath` string).
 
 # LIMITATIONS
 

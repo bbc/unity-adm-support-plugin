@@ -20,31 +20,48 @@ set(BUILD_INSTALL_STATIC_PIC_LIBRARIES ON CACHE BOOL "static pic libs" FORCE)
 set(BUILD_USE_SNDFILE_LIBRARY OFF CACHE BOOL "libsndfile" FORCE)
 set(BUILD_STANDALONE_APPLICATIONS OFF CACHE BOOL "applications" FORCE)
 
-# @loader_path = Path of the library that loaded this shared lib. 
-#                I.e, libunityadm.bundle/Content/MacOS/ 
-#                 - this is where all libs will reside, including the binary for libunityadm.bundle
-
-# set(CMAKE_INSTALL_RPATH "@loader_path") # The rpath to use in installed targets - allows libs to find each other
-# set(CMAKE_MACOSX_RPATH ON) # Activate rpath support
-# set(CMAKE_SKIP_BUILD_RPATH FALSE) # Build with an rpath, but...
-# set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE) # ...CMAKE_INSTALL_RPATH is applied at install phase, not build phase (gets relinked)
-# set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE) # Prevent adding other search paths. We should only be using the one we set explicitly. If that doesn't work, somethings wrong.
-# set(AUTOSET_RPATH OFF CACHE BOOL "Automatically set rpath" FORCE)
-
-# set(CMAKE_INSTALL_NAME_DIR "@loader_path") # An install name is just a pathname embedded within a dynamic library which tells the linker where that library can be found at runtime
-# set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR TRUE) # set the directory portion of the “install_name” field of shared libraries on Mac OSX
-
 set(VISR_TARGET_TYPE static_pic)
 
-add_subdirectory(rd-audio-visr EXCLUDE_FROM_ALL) # EXCLUDE_FROM_ALL prevents VISRs default install behaviour
+include(FetchContent)
+FetchContent_Declare(
+    visr
+    URL https://github.com/ebu/bear/releases/download/v0.0.1-pre/visr-0.13.0-pre-5e13f020.zip
+    URL_HASH SHA256=9ff85e35da728226c56e6487e3f5beb99b9617cf58d4543a456674a79c2895cb
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/visr"
+)
+FetchContent_GetProperties(visr)
+if(NOT visr_POPULATED)
+    FetchContent_Populate(visr)
+
+    # VISR ffts M1 fix
+    if(APPLE)
+        execute_process(COMMAND patch -p1 INPUT_FILE ${CMAKE_CURRENT_SOURCE_DIR}/0001-fix-build-on-apple-m1.patch
+                WORKING_DIRECTORY "${visr_SOURCE_DIR}"
+                )
+    endif()
+endif()
+
+message(STATUS visr_POPULATED " - " ${visr_POPULATED})
+message(STATUS visr_SOURCE_DIR " - " ${visr_SOURCE_DIR})
+message(STATUS visr_BINARY_DIR " - " ${visr_BINARY_DIR})
+
+add_subdirectory(${visr_SOURCE_DIR} ${visr_BINARY_DIR} EXCLUDE_FROM_ALL) # EXCLUDE_FROM_ALL prevents VISRs default install behaviour
+
+# Only add targets optimised with specific instruction sets where they exist
+# e.g. don't try and link to SSE optimised build on arm64
+set(base_efl_target efl_${VISR_TARGET_TYPE})
+foreach(instruction_set IN ITEMS "" _AVX _FMA _SSE)
+  set(current_target ${base_efl_target}${instruction_set})
+  if(TARGET ${current_target})
+    list(APPEND efl_targets ${current_target})
+  endif()
+endforeach()
+message(STATUS "Using the following efl targets:\n${efl_targets}\n")
 
 set(VISR_TARGET_NAMES
     apputilities_${VISR_TARGET_TYPE}
     audiointerfaces_${VISR_TARGET_TYPE}
-    efl_${VISR_TARGET_TYPE}
-    efl_${VISR_TARGET_TYPE}_AVX
-    efl_${VISR_TARGET_TYPE}_FMA
-    efl_${VISR_TARGET_TYPE}_SSE
+    ${efl_targets}
     objectmodel_${VISR_TARGET_TYPE}
     panning_${VISR_TARGET_TYPE}
     panningdsp_${VISR_TARGET_TYPE}
@@ -90,11 +107,12 @@ set_target_properties(adm resource_embedder PROPERTIES FOLDER submodules/libadm)
 
 set(BUILD_PYTHON_BINDINGS OFF CACHE BOOL "Python" FORCE)
 set(BEAR_UNIT_TESTS OFF CACHE BOOL "bear unit tests" FORCE)
-set(BEAR_DOWNLOAD_DATA ON CACHE BOOL "bear data files" FORCE)
+set(BEAR_DOWNLOAD_DATA_DEFAULT ON CACHE BOOL "bear data files" FORCE)
+set(BEAR_DOWNLOAD_DATA_DEFAULT_SMALL OFF CACHE BOOL "bear data files" FORCE)
 set(BEAR_VISR_LIB_TYPE "${VISR_TARGET_TYPE}" CACHE STRING "bear visr lib type" FORCE)
-add_subdirectory(bear/visr_bear EXCLUDE_FROM_ALL)
+add_subdirectory(bear/visr_bear)
 set_target_properties(bear PROPERTIES FOLDER submodules/bear)
-set_target_properties(ear libear_resource_embedder PROPERTIES FOLDER submodules/libear)
+set_target_properties(ear PROPERTIES FOLDER submodules/libear)
 add_dependencies(bear ${VISR_TARGET_NAMES})
 
 

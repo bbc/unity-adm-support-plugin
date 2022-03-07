@@ -20,14 +20,45 @@ namespace ADM
         public int upperFrameBound;
     }
 
+    class ItemBlockTracker
+    {
+        public ItemBlockTracker(UInt64 id)
+        {
+            itemId = id;
+        }
+
+        public UInt64 id
+        {
+            get => itemId;
+        }
+
+        private UInt64 itemId;
+        public int blockSendCounter = 0;
+    }
+
     public class BearItemTracker
     {
         // No standard containers really suitable, so make our own
 
+        public void filterByAudioProgrammeId(int progId)
+        {
+            currentAudioProgrammeIdFilter = progId;
+            foreach(ItemBlockTracker item in orderedItems)
+            {
+                // Jump back one block so BEAR has an initial state for newly contributing items
+                if(item.blockSendCounter > 0) item.blockSendCounter--;
+            }
+            mappingsDirty = true;
+        }
+
+        public void removeFilter()
+        {
+            filterByAudioProgrammeId(-1);
+        }
+
         public void addId(UInt64 id)
         {
-            orderedIds.Add(id);
-            blockSendCounters.Add(0);
+            orderedItems.Add(new ItemBlockTracker(id));
             mappingsDirty = true;
         }
 
@@ -41,12 +72,12 @@ namespace ADM
 
         public bool hasId(UInt64 id)
         {
-            return orderedIds.Contains(id);
+            return getIndexOfId(id) >= 0;
         }
 
         public int countIds()
         {
-            return orderedIds.Count;
+            return orderedFilteredItems.Count;
         }
 
         public int countChannels()
@@ -57,50 +88,63 @@ namespace ADM
 
         public UInt64 getIdAtIndex(int index)
         {
-            return orderedIds[index];
+            return orderedFilteredItems[index].id;
         }
 
         public int getIndexOfId(UInt64 id)
         {
-            return orderedIds.IndexOf(id);
+            for(int i=0; i < orderedFilteredItems.Count; i++)
+            {
+                if (orderedFilteredItems[i].id == id) return i;
+            }
+            return -1;
         }
 
         public int getBlockSendCounterAtIndex(int index)
         {
-            return blockSendCounters[index];
+            return orderedFilteredItems[index].blockSendCounter;
         }
 
         public int incBlockSendCounterAtIndex(int index)
         {
-            blockSendCounters[index]++;
-            return blockSendCounters[index];
+            orderedFilteredItems[index].blockSendCounter++;
+            return orderedFilteredItems[index].blockSendCounter;
         }
 
         public void updateMappings()
         {
             if (mappingsDirty)
             {
-                int totalChs = 0;
-                for (int i = 0; i < orderedIds.Count; i++)
+                orderedFilteredItems.Clear();
+                for (int i = 0; i < orderedItems.Count; i++)
                 {
-                    totalChs += GlobalState.metadataHandler.renderableItems[orderedIds[i]].originChannelNums.Count;
+                    if (currentAudioProgrammeIdFilter < 0 || GlobalState.metadataHandler.renderableItems[orderedItems[i].id].audioProgrammeIds.Contains(currentAudioProgrammeIdFilter))
+                    {
+                        orderedFilteredItems.Add(orderedItems[i]);
+                    }
+                }
+
+                int totalChs = 0;
+                for (int i = 0; i < orderedFilteredItems.Count; i++)
+                {
+                    totalChs += GlobalState.metadataHandler.renderableItems[orderedFilteredItems[i].id].originChannelNums.Count;
                 }
 
                 inputChannelNums = new int[totalChs];
                 audioBounds = new ChannelAudioBounds[totalChs];
                 int arrIndex = 0;
 
-                for (int index = 0; index < orderedIds.Count; index++)
+                for (int index = 0; index < orderedFilteredItems.Count; index++)
                 {
-                    for (int ch = 0; ch < GlobalState.metadataHandler.renderableItems[orderedIds[index]].originChannelNums.Count; ch++)
+                    for (int ch = 0; ch < GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].originChannelNums.Count; ch++)
                     {
-                        inputChannelNums[arrIndex] = GlobalState.metadataHandler.renderableItems[orderedIds[index]].originChannelNums[ch];
+                        inputChannelNums[arrIndex] = GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].originChannelNums[ch];
                         audioBounds[arrIndex] = new ChannelAudioBounds();
-                        audioBounds[arrIndex].lowerFrameBound = GlobalState.metadataHandler.renderableItems[orderedIds[index]].audioStartFrame;
-                        audioBounds[arrIndex].upperFrameBound = GlobalState.metadataHandler.renderableItems[orderedIds[index]].audioEndFrame;
+                        audioBounds[arrIndex].lowerFrameBound = GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].audioStartFrame;
+                        audioBounds[arrIndex].upperFrameBound = GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].audioEndFrame;
                         arrIndex++;
                     }
-                    if (DebugSettings.BearChannelAssignments) Debug.Log("BEAR Channel " + index + " assigned to \"" + GlobalState.metadataHandler.renderableItems[orderedIds[index]].name + "\"");
+                    if (DebugSettings.BearChannelAssignments) Debug.Log("BEAR Channel " + index + " assigned to \"" + GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].name + "\"");
                 }
                 mappingsDirty = false;
             }
@@ -114,13 +158,13 @@ namespace ADM
 
         public int[] getChannelIndicesForIndex(int index)
         {
-            var chs = new int[GlobalState.metadataHandler.renderableItems[orderedIds[index]].originChannelNums.Count];
+            var chs = new int[GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].originChannelNums.Count];
             int startCh = 0;
             for (int i = 0; i < index; i++)
             {
-                startCh += GlobalState.metadataHandler.renderableItems[orderedIds[i]].originChannelNums.Count;
+                startCh += GlobalState.metadataHandler.renderableItems[orderedFilteredItems[i].id].originChannelNums.Count;
             }
-            for (int i = 0; i < GlobalState.metadataHandler.renderableItems[orderedIds[index]].originChannelNums.Count; i++)
+            for (int i = 0; i < GlobalState.metadataHandler.renderableItems[orderedFilteredItems[index].id].originChannelNums.Count; i++)
             {
                 chs[i] = startCh + i;
             }
@@ -129,12 +173,13 @@ namespace ADM
 
         public ref ChannelAudioBounds[] getAudioBounds()
         {
-            Debug.Assert(!mappingsDirty, "Maps are is dirty - ensure updateMappings is called first (will need GlobalState.metadataHandler.renderableItems lock)");
+            Debug.Assert(!mappingsDirty, "Maps are dirty - ensure updateMappings is called first (will need GlobalState.metadataHandler.renderableItems lock)");
             return ref audioBounds;
         }
 
-        private List<UInt64> orderedIds = new List<UInt64>();
-        private List<int> blockSendCounters = new List<int>();
+        private List<ItemBlockTracker> orderedItems = new List<ItemBlockTracker>();
+        private List<ItemBlockTracker> orderedFilteredItems = new List<ItemBlockTracker>();
+        private int currentAudioProgrammeIdFilter = -1;
         private bool mappingsDirty = false;
         private int[] inputChannelNums = new int[0];
         private ChannelAudioBounds[] audioBounds = new ChannelAudioBounds[0];
@@ -263,6 +308,32 @@ namespace ADM
         {
             offsetCalculated = false;
             if (audioSource) audioSource.Stop();
+        }
+
+        public void setAudioProgrammeId(int progId)
+        {
+            lock (GlobalState.metadataHandler.renderableItemsLock)
+            {
+                bearObjects.filterByAudioProgrammeId(progId);
+                bearObjects.updateMappings(); // Forces a regen if dirty
+                bearDirectSpeakers.filterByAudioProgrammeId(progId);
+                bearDirectSpeakers.updateMappings(); // Forces a regen if dirty
+                bearHoa.filterByAudioProgrammeId(progId);
+                bearHoa.updateMappings(); // Forces a regen if dirty
+            }
+        }
+
+        public void resetAudioProgrammeId()
+        {
+            lock (GlobalState.metadataHandler.renderableItemsLock)
+            {
+                bearObjects.removeFilter();
+                bearObjects.updateMappings(); // Forces a regen if dirty
+                bearDirectSpeakers.removeFilter();
+                bearDirectSpeakers.updateMappings(); // Forces a regen if dirty
+                bearHoa.removeFilter();
+                bearHoa.updateMappings(); // Forces a regen if dirty
+            }
         }
 
         public void configureNewItems(ref List<UInt64> itemsAwaitingConfig)

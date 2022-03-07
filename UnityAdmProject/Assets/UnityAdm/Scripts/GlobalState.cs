@@ -79,7 +79,10 @@ namespace ADM
         public static GameObject dsVisualisation;
         public static GameObject hoaVisualisation;
         public static float defaultReferenceDistance;
+        public static bool alwaysOverrideAbsoluteDistance;
         public static AudioRendererType audioRendererType = AudioRendererType.NONE;
+        public static bool renderOnlySelectedAudioProgramme = false;
+        public static int selectedAudioProgrammeId = 0;
 
         // BEAR Specific config
         public static string BearDataFilePath = "";
