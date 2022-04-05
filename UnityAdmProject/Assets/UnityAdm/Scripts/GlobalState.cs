@@ -94,31 +94,143 @@ namespace ADM
         public static float BearOutputGain = 0.775f;
         public static SrcType BearSrcType = SrcType.SincMediumQuality;
 
-        // Offsetting
-        public static double directSpeakersXOffset = 0.0;
-        public static double directSpeakersYOffset = 0.0;
-        public static double directSpeakersZOffset = 0.0;
+        // Runtime-modifiable Properties
+        public static long propertiesRevisionCounter = 0;
+
+        /// Offsetting
+        private static double _directSpeakersXOffset = 0.0;
+        public static double directSpeakersXOffset
+        {
+            get { return _directSpeakersXOffset; }
+            set
+            {
+                _directSpeakersXOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _directSpeakersYOffset = 0.0;
+        public static double directSpeakersYOffset
+        {
+            get { return _directSpeakersYOffset; }
+            set
+            {
+                _directSpeakersYOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _directSpeakersZOffset = 0.0;
+        public static double directSpeakersZOffset
+        {
+            get { return _directSpeakersZOffset; }
+            set
+            {
+                _directSpeakersZOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
         public static bool applyDirectSpeakersCartOffset
         {
             get { return (directSpeakersXOffset != 0.0 || directSpeakersYOffset != 0.0 || directSpeakersZOffset != 0.0); }
         }
-        public static double directSpeakersAzimuthOffset = 0.0;
-        public static double directSpeakersElevationOffset = 0.0;
-        public static double directSpeakersDistanceMultiplier = 1.0;
+        private static double _directSpeakersAzimuthOffset = 0.0;
+        public static double directSpeakersAzimuthOffset
+        {
+            get { return _directSpeakersAzimuthOffset; }
+            set
+            {
+                _directSpeakersAzimuthOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _directSpeakersElevationOffset = 0.0;
+        public static double directSpeakersElevationOffset
+        {
+            get { return _directSpeakersElevationOffset; }
+            set
+            {
+                _directSpeakersElevationOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _directSpeakersDistanceMultiplier = 1.0;
+        public static double directSpeakersDistanceMultiplier
+        {
+            get { return _directSpeakersDistanceMultiplier; }
+            set
+            {
+                _directSpeakersDistanceMultiplier = value;
+                propertiesRevisionCounter++;
+            }
+        }
         public static bool applyDirectSpeakersSphOffset
         {
             get { return (directSpeakersAzimuthOffset != 0.0 || directSpeakersElevationOffset != 0.0 || directSpeakersDistanceMultiplier != 1.0); }
         }
-        public static double objectsXOffset = 0.0;
-        public static double objectsYOffset = 0.0;
-        public static double objectsZOffset = 0.0;
+
+        private static double _objectsXOffset = 0.0;
+        public static double objectsXOffset
+        {
+            get { return _objectsXOffset; }
+            set
+            {
+                _objectsXOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _objectsYOffset = 0.0;
+        public static double objectsYOffset
+        {
+            get { return _objectsYOffset; }
+            set
+            {
+                _objectsYOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _objectsZOffset = 0.0;
+        public static double objectsZOffset
+        {
+            get { return _objectsZOffset; }
+            set
+            {
+                _objectsZOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
         public static bool applyObjectsCartOffset
         {
             get { return (objectsXOffset != 0.0 || objectsYOffset != 0.0 || objectsZOffset != 0.0); }
         }
-        public static double objectsAzimuthOffset = 0.0;
-        public static double objectsElevationOffset = 0.0;
-        public static double objectsDistanceMultiplier = 1.0;
+        private static double _objectsAzimuthOffset = 0.0;
+        public static double objectsAzimuthOffset
+        {
+            get { return _objectsAzimuthOffset; }
+            set
+            {
+                _objectsAzimuthOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _objectsElevationOffset = 0.0;
+        public static double objectsElevationOffset
+        {
+            get { return _objectsElevationOffset; }
+            set
+            {
+                _objectsElevationOffset = value;
+                propertiesRevisionCounter++;
+            }
+        }
+        private static double _objectsDistanceMultiplier = 1.0;
+        public static double objectsDistanceMultiplier
+        {
+            get { return _objectsDistanceMultiplier; }
+            set
+            {
+                _objectsDistanceMultiplier = value;
+                propertiesRevisionCounter++;
+            }
+        }
         public static bool applyObjectsSphOffset
         {
             get { return (objectsAzimuthOffset != 0.0 || objectsElevationOffset != 0.0 || objectsDistanceMultiplier != 1.0); }
