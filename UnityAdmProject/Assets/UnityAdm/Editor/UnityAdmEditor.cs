@@ -39,6 +39,10 @@ public class UnityAdmFunctions : EditorWindow
         {
             stopPlayback();
         }
+        if (GUILayout.Button("Apply new settings"))
+        {
+            apply();
+        }
         if (GUILayout.Button("Apply new settings and Reinitialise"))
         {
             reinit();
@@ -64,6 +68,14 @@ public class UnityAdmFunctions : EditorWindow
 
         var script = FindObjectOfType<UnityAdm>();
         script.stopPlayback();
+    }
+
+    private void apply()
+    {
+        if (!Application.isPlaying) return;
+
+        var script = FindObjectOfType<UnityAdm>();
+        script.applySettings();
     }
 
     private void reinit()
