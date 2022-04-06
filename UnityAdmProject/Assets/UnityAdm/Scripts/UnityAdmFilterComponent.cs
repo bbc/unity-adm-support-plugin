@@ -187,12 +187,27 @@ namespace ADM
                         int blockNum = bear.bearObjects.getBlockSendCounterAtIndex(index);
                         int blockNumLimit = GlobalState.metadataHandler.renderableItems[id].blocks.Count;
 
+                        if (blockNum > 0)
+                        {
+                            // Ensure last block we sent has not gone stale in meantime
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].processMetadataBlockIfNecessary();
+                            long targetRevision = GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessedRevision;
+                            if (bear.bearObjects.getLastSentBlockRevisionForIndex(index) < targetRevision)
+                            {
+                                // Last sent block has since changed (due to script properties change) - resend
+                                LibraryInterface.addBearObjectMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessed);
+                                bear.bearObjects.setLastSentBlockRevisionForIndex(index, targetRevision);
+                            }
+                        }
+
                         while (blockNum < blockNumLimit)
                         {
-                            if (!LibraryInterface.addBearObjectMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlock))
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].processMetadataBlockIfNecessary(); // Because we are accessing by ref, we can't use getter to ensure up to date.
+                            if (!LibraryInterface.addBearObjectMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessed))
                             {
                                 break;
                             }
+                            bear.bearObjects.setLastSentBlockRevisionForIndex(index, GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessedRevision);
                             blockNum = bear.bearObjects.incBlockSendCounterAtIndex(index);
                         }
                     }
@@ -206,12 +221,27 @@ namespace ADM
                         int blockNum = bear.bearDirectSpeakers.getBlockSendCounterAtIndex(index);
                         int blockNumLimit = GlobalState.metadataHandler.renderableItems[id].blocks.Count;
 
+                        if (blockNum > 0)
+                        {
+                            // Ensure last block we sent has not gone stale in meantime
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].processMetadataBlockIfNecessary();
+                            long targetRevision = GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessedRevision;
+                            if (bear.bearDirectSpeakers.getLastSentBlockRevisionForIndex(index) < targetRevision)
+                            {
+                                // Last sent block has since changed (due to script properties change) - resend
+                                LibraryInterface.addBearObjectMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessed);
+                                bear.bearDirectSpeakers.setLastSentBlockRevisionForIndex(index, targetRevision);
+                            }
+                        }
+
                         while (blockNum < blockNumLimit)
                         {
-                            if (!LibraryInterface.addBearDirectSpeakersMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlock))
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].processMetadataBlockIfNecessary(); // Because we are accessing by ref, we can't use getter to ensure up to date.
+                            if (!LibraryInterface.addBearDirectSpeakersMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessed))
                             {
                                 break;
                             }
+                            bear.bearDirectSpeakers.setLastSentBlockRevisionForIndex(index, GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessedRevision);
                             blockNum = bear.bearDirectSpeakers.incBlockSendCounterAtIndex(index);
                         }
                     }
@@ -225,12 +255,27 @@ namespace ADM
                         int blockNum = bear.bearHoa.getBlockSendCounterAtIndex(index);
                         int blockNumLimit = GlobalState.metadataHandler.renderableItems[id].blocks.Count;
 
+                        if (blockNum > 0)
+                        {
+                            // Ensure last block we sent has not gone stale in meantime
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].processMetadataBlockIfNecessary();
+                            long targetRevision = GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessedRevision;
+                            if (bear.bearHoa.getLastSentBlockRevisionForIndex(index) < targetRevision)
+                            {
+                                // Last sent block has since changed (due to script properties change) - resend
+                                LibraryInterface.addBearObjectMetadata(index, ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum - 1].metadataBlockProcessed);
+                                bear.bearHoa.setLastSentBlockRevisionForIndex(index, targetRevision);
+                            }
+                        }
+
                         while (blockNum < blockNumLimit)
                         {
-                            if (!LibraryInterface.addBearHoaMetadata(bear.bearHoa.getChannelIndicesForIndex(index), ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlock))
+                            GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].processMetadataBlockIfNecessary(); // Because we are accessing by ref, we can't use getter to ensure up to date.
+                            if (!LibraryInterface.addBearHoaMetadata(bear.bearHoa.getChannelIndicesForIndex(index), ref GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessed))
                             {
                                 break;
                             }
+                            bear.bearHoa.setLastSentBlockRevisionForIndex(index, GlobalState.metadataHandler.renderableItems[id].blocks[blockNum].metadataBlockProcessedRevision);
                             blockNum = bear.bearHoa.incBlockSendCounterAtIndex(index);
                         }
                     }

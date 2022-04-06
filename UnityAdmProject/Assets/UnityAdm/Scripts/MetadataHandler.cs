@@ -64,7 +64,131 @@ namespace ADM
 
     public class BlockData
     {
-        public RawMetadataBlock metadataBlock; // TODO: Try to avoid blocks since that already has a meaning in ADM and these aren't directly mappable to them (esp with combined cfs in an item)
+
+        public RawMetadataBlock metadataBlockOriginal; // TODO: Try to avoid "block" since that already has a meaning in ADM and these aren't directly mappable to them (esp with combined cfs in an item)
+        public RawMetadataBlock metadataBlockProcessed; // Have to make public because we do some pass-by-refs which can't be done via the metadataBlock getter
+        private long _metadataBlockProcessedAtRevision = -1;
+        public long metadataBlockProcessedRevision
+        {
+            get { return _metadataBlockProcessedAtRevision; }
+        }
+
+        public RawMetadataBlock metadataBlock
+        {
+            get {
+                processMetadataBlockIfNecessary();
+                return metadataBlockProcessed;
+            }
+        }
+
+        public bool metadataBlockRequiresReprocessing()
+        {
+            return _metadataBlockProcessedAtRevision < GlobalState.propertiesRevisionCounter;
+        }
+
+        public bool processMetadataBlockIfNecessary()
+        {
+            if (!metadataBlockRequiresReprocessing())
+            {
+                return false;
+            }
+            processMetadataBlock();
+            return true;
+        }
+
+        public void processMetadataBlock()
+        {
+            metadataBlockProcessed = metadataBlockOriginal;
+            _metadataBlockProcessedAtRevision = GlobalState.propertiesRevisionCounter;
+
+            if (metadataBlockProcessed.cartesian == 1)
+            {
+                metadataBlockProcessed.azimuth = 0.0;
+                metadataBlockProcessed.elevation = 0.0;
+                metadataBlockProcessed.distance = Mathf.Sqrt((float)((metadataBlockProcessed.x * metadataBlockProcessed.x) + (metadataBlockProcessed.y * metadataBlockProcessed.y) + (metadataBlockProcessed.z * metadataBlockProcessed.z)));
+                if (metadataBlockProcessed.distance > 0.0)
+                {
+                    metadataBlockProcessed.azimuth = -Mathf.Atan2((float)(metadataBlockProcessed.x), (float)(metadataBlockProcessed.y)) * 180.0 / Mathf.PI;
+                    metadataBlockProcessed.elevation = Mathf.Asin((float)(metadataBlockProcessed.z / metadataBlockProcessed.distance)) * 180.0 / Mathf.PI;
+                }
+
+            }
+
+            // Definitely have Sph coords at this point (existing or just computed)
+            // Sph offsets
+            bool sphOffsetApplied = false;
+            if (metadataBlockProcessed.typeDef == (byte)AdmTypeDefs.OBJECTS)
+            {
+                if (GlobalState.applyObjectsSphOffset)
+                {
+                    sphOffsetApplied = true;
+                    metadataBlockProcessed.azimuth += GlobalState.objectsAzimuthOffset;
+                    metadataBlockProcessed.elevation += GlobalState.objectsElevationOffset;
+                    metadataBlockProcessed.distance *= GlobalState.objectsDistanceMultiplier;
+                }
+            }
+            else if (metadataBlockProcessed.typeDef == (byte)AdmTypeDefs.DIRECTSPEAKERS)
+            {
+                if (GlobalState.applyDirectSpeakersSphOffset)
+                {
+                    sphOffsetApplied = true;
+                    metadataBlockProcessed.azimuth += GlobalState.directSpeakersAzimuthOffset;
+                    metadataBlockProcessed.elevation += GlobalState.directSpeakersElevationOffset;
+                    metadataBlockProcessed.distance *= GlobalState.directSpeakersDistanceMultiplier;
+                }
+            }
+
+            if (metadataBlockProcessed.cartesian == 0 || sphOffsetApplied) // Either never had cartesian, or carts will need updating due to sph offsetting
+            {
+                // Update Cartesian
+                metadataBlockProcessed.x = metadataBlockProcessed.distance * Mathf.Sin((float)(-metadataBlockProcessed.azimuth * Mathf.PI / 180.0)) * Mathf.Cos((float)(metadataBlockProcessed.elevation * Mathf.PI / 180.0));
+                metadataBlockProcessed.y = metadataBlockProcessed.distance * Mathf.Cos((float)(-metadataBlockProcessed.azimuth * Mathf.PI / 180.0)) * Mathf.Cos((float)(metadataBlockProcessed.elevation * Mathf.PI / 180.0));
+                metadataBlockProcessed.z = metadataBlockProcessed.distance * Mathf.Sin((float)(metadataBlockProcessed.elevation * Mathf.PI / 180.0));
+            }
+
+            // Cart offsets
+            bool cartOffsetApplied = false;
+            if (metadataBlockProcessed.typeDef == (byte)AdmTypeDefs.OBJECTS)
+            {
+                if (GlobalState.applyObjectsCartOffset)
+                {
+                    cartOffsetApplied = true;
+                    metadataBlockProcessed.x += GlobalState.objectsXOffset;
+                    metadataBlockProcessed.y += GlobalState.objectsYOffset;
+                    metadataBlockProcessed.z += GlobalState.objectsZOffset;
+                }
+            }
+            else if (metadataBlockProcessed.typeDef == (byte)AdmTypeDefs.DIRECTSPEAKERS)
+            {
+                if (GlobalState.applyDirectSpeakersCartOffset)
+                {
+                    cartOffsetApplied = true;
+                    metadataBlockProcessed.x += GlobalState.directSpeakersXOffset;
+                    metadataBlockProcessed.y += GlobalState.directSpeakersYOffset;
+                    metadataBlockProcessed.z += GlobalState.directSpeakersZOffset;
+                }
+            }
+
+            if (cartOffsetApplied) // Sph will need updating due to cart offsetting
+            {
+                metadataBlockProcessed.azimuth = 0.0;
+                metadataBlockProcessed.elevation = 0.0;
+                metadataBlockProcessed.distance = Mathf.Sqrt((float)((metadataBlockProcessed.x * metadataBlockProcessed.x) + (metadataBlockProcessed.y * metadataBlockProcessed.y) + (metadataBlockProcessed.z * metadataBlockProcessed.z)));
+                if (metadataBlockProcessed.distance > 0.0)
+                {
+                    metadataBlockProcessed.azimuth = -Mathf.Atan2((float)(metadataBlockProcessed.x), (float)(metadataBlockProcessed.y)) * 180.0 / Mathf.PI;
+                    metadataBlockProcessed.elevation = Mathf.Asin((float)(metadataBlockProcessed.z / metadataBlockProcessed.distance)) * 180.0 / Mathf.PI;
+                }
+
+            }
+
+            //absoluteDistance
+            if (GlobalState.alwaysOverrideAbsoluteDistance || double.IsNaN(metadataBlockProcessed.absoluteDistance) || metadataBlockProcessed.absoluteDistance < 0.0)
+            {
+                metadataBlockProcessed.absoluteDistance = GlobalState.defaultReferenceDistance;
+            }
+
+        }
 
         public double startTime
         {
@@ -92,10 +216,11 @@ namespace ADM
         }
 
         private Vector3 _finalPosInGame;
-        private bool _finalPosInGameSet;
+        private long _finalPosInGameFromRevision = -1;
         public ref Vector3 finalPosInGame()
         {
-            if (!_finalPosInGameSet)
+            long targetRevision = GlobalState.propertiesRevisionCounter;
+            if (_finalPosInGameFromRevision < targetRevision)
             {
 
                 // NOTE: Z and Y are swapped!! different coordinate systems;
@@ -114,7 +239,7 @@ namespace ADM
                         (float)(metadataBlock.y * metadataBlock.absoluteDistance));
                 }
 
-                _finalPosInGameSet = true;
+                _finalPosInGameFromRevision = targetRevision;
             }
             return ref _finalPosInGame;
         }
@@ -340,107 +465,13 @@ namespace ADM
                             renderableItems[latestIncomingMetadata.id].audioProgrammeIds.Add(audioProgrammeId);
                         }
                     }
-                    renderableItems[latestIncomingMetadata.id].blocks.Add(populateBlockData(latestIncomingMetadata));
+                    BlockData block = new BlockData();
+                    block.metadataBlockOriginal = latestIncomingMetadata;
+                    renderableItems[latestIncomingMetadata.id].blocks.Add(block);
                 }
 
             }
             return true;
-        }
-
-        private BlockData populateBlockData(RawMetadataBlock metadataBlock)
-        {
-            BlockData block = new BlockData();
-
-            if (metadataBlock.cartesian == 1)
-            {
-                metadataBlock.azimuth = 0.0;
-                metadataBlock.elevation = 0.0;
-                metadataBlock.distance = Mathf.Sqrt((float)((metadataBlock.x * metadataBlock.x) + (metadataBlock.y * metadataBlock.y) + (metadataBlock.z * metadataBlock.z)));
-                if (metadataBlock.distance > 0.0)
-                {
-                    metadataBlock.azimuth = -Mathf.Atan2((float)(metadataBlock.x), (float)(metadataBlock.y)) * 180.0 / Mathf.PI;
-                    metadataBlock.elevation = Mathf.Asin((float)(metadataBlock.z / metadataBlock.distance)) * 180.0 / Mathf.PI;
-                }
-
-            }
-
-            // Definitely have Sph coords at this point (existing or just computed)
-            // Sph offsets
-            bool sphOffsetApplied = false;
-            if (metadataBlock.typeDef == (byte)AdmTypeDefs.OBJECTS)
-            {
-                if (GlobalState.applyObjectsSphOffset)
-                {
-                    sphOffsetApplied = true;
-                    metadataBlock.azimuth += GlobalState.objectsAzimuthOffset;
-                    metadataBlock.elevation += GlobalState.objectsElevationOffset;
-                    metadataBlock.distance *= GlobalState.objectsDistanceMultiplier;
-                }
-            }
-            else if (metadataBlock.typeDef == (byte)AdmTypeDefs.DIRECTSPEAKERS)
-            {
-                if (GlobalState.applyDirectSpeakersSphOffset)
-                {
-                    sphOffsetApplied = true;
-                    metadataBlock.azimuth += GlobalState.directSpeakersAzimuthOffset;
-                    metadataBlock.elevation += GlobalState.directSpeakersElevationOffset;
-                    metadataBlock.distance *= GlobalState.directSpeakersDistanceMultiplier;
-                }
-            }
-
-            if (metadataBlock.cartesian == 0 || sphOffsetApplied) // Either never had cartesian, or carts will need updating due to sph offsetting
-            {
-                // Update Cartesian
-                metadataBlock.x = metadataBlock.distance * Mathf.Sin((float)(-metadataBlock.azimuth * Mathf.PI / 180.0)) * Mathf.Cos((float)(metadataBlock.elevation * Mathf.PI / 180.0));
-                metadataBlock.y = metadataBlock.distance * Mathf.Cos((float)(-metadataBlock.azimuth * Mathf.PI / 180.0)) * Mathf.Cos((float)(metadataBlock.elevation * Mathf.PI / 180.0));
-                metadataBlock.z = metadataBlock.distance * Mathf.Sin((float)(metadataBlock.elevation * Mathf.PI / 180.0));
-            }
-
-            // Cart offsets
-            bool cartOffsetApplied = false;
-            if (metadataBlock.typeDef == (byte)AdmTypeDefs.OBJECTS)
-            {
-                if (GlobalState.applyObjectsCartOffset)
-                {
-                    cartOffsetApplied = true;
-                    metadataBlock.x += GlobalState.objectsXOffset;
-                    metadataBlock.y += GlobalState.objectsYOffset;
-                    metadataBlock.z += GlobalState.objectsZOffset;
-                }
-            }
-            else if (metadataBlock.typeDef == (byte)AdmTypeDefs.DIRECTSPEAKERS)
-            {
-                if (GlobalState.applyDirectSpeakersCartOffset)
-                {
-                    cartOffsetApplied = true;
-                    metadataBlock.x += GlobalState.directSpeakersXOffset;
-                    metadataBlock.y += GlobalState.directSpeakersYOffset;
-                    metadataBlock.z += GlobalState.directSpeakersZOffset;
-                }
-            }
-
-            if (cartOffsetApplied) // Sph will need updating due to cart offsetting
-            {
-                metadataBlock.azimuth = 0.0;
-                metadataBlock.elevation = 0.0;
-                metadataBlock.distance = Mathf.Sqrt((float)((metadataBlock.x * metadataBlock.x) + (metadataBlock.y * metadataBlock.y) + (metadataBlock.z * metadataBlock.z)));
-                if (metadataBlock.distance > 0.0)
-                {
-                    metadataBlock.azimuth = -Mathf.Atan2((float)(metadataBlock.x), (float)(metadataBlock.y)) * 180.0 / Mathf.PI;
-                    metadataBlock.elevation = Mathf.Asin((float)(metadataBlock.z / metadataBlock.distance)) * 180.0 / Mathf.PI;
-                }
-
-            }
-
-            //absoluteDistance
-            if (GlobalState.alwaysOverrideAbsoluteDistance || double.IsNaN(metadataBlock.absoluteDistance) || metadataBlock.absoluteDistance < 0.0)
-            {
-                metadataBlock.absoluteDistance = GlobalState.defaultReferenceDistance;
-            }
-
-            block.metadataBlock = metadataBlock;
-
-            return block;
         }
 
         private void prepareItem(ref RawMetadataBlock metadataBlock)

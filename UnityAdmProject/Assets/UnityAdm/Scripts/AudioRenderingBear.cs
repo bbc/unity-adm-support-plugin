@@ -34,6 +34,7 @@ namespace ADM
 
         private UInt64 itemId;
         public int blockSendCounter = 0;
+        public long lastSentBlockRevision = -1;
     }
 
     public class BearItemTracker
@@ -109,6 +110,16 @@ namespace ADM
         {
             orderedFilteredItems[index].blockSendCounter++;
             return orderedFilteredItems[index].blockSendCounter;
+        }
+
+        public void setLastSentBlockRevisionForIndex(int index, long revision)
+        {
+            orderedFilteredItems[index].lastSentBlockRevision = revision;
+        }
+
+        public long getLastSentBlockRevisionForIndex(int index)
+        {
+            return orderedFilteredItems[index].lastSentBlockRevision;
         }
 
         public void updateMappings()
