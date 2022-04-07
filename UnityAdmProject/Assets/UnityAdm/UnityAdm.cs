@@ -277,6 +277,20 @@ public class UnityAdm : MonoBehaviour
         while (objectsElevationOffset > 90.0) objectsElevationOffset = 90.0;
         while (objectsElevationOffset < -90.0) objectsElevationOffset = -90.0;
         if (objectsDistanceMultiplier < 0.0) objectsDistanceMultiplier = 0.0;
+
+        GlobalState.directSpeakersXOffset = directSpeakersUnityXOffset;
+        GlobalState.directSpeakersYOffset = directSpeakersUnityZOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.directSpeakersZOffset = directSpeakersUnityYOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.directSpeakersAzimuthOffset = directSpeakersAzimuthOffset;
+        GlobalState.directSpeakersElevationOffset = directSpeakersElevationOffset;
+        GlobalState.directSpeakersDistanceMultiplier = directSpeakersDistanceMultiplier;
+        GlobalState.objectsXOffset = objectsUnityXOffset;
+        GlobalState.objectsYOffset = objectsUnityZOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.objectsZOffset = objectsUnityYOffset; // NOTE Y/Z SWITCH (Unity vs ADM)
+        GlobalState.objectsAzimuthOffset = objectsAzimuthOffset;
+        GlobalState.objectsElevationOffset = objectsElevationOffset;
+        GlobalState.objectsDistanceMultiplier = objectsDistanceMultiplier;
+
     }
 
 	public void recentreListener()
